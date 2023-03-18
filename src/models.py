@@ -263,6 +263,7 @@ class GraphSage(nn.Module):
         raw_features,
         adj_lists,
         device,
+        use_unified_tensor=False,
         unique_after_sample=True,
         gcn=False,
         agg_func="MEAN",

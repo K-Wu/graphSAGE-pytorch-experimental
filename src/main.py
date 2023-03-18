@@ -23,6 +23,8 @@ parser.add_argument("--unsup_loss", type=str, default="normal")
 parser.add_argument("--max_vali_f1", type=float, default=0)
 parser.add_argument("--name", type=str, default="debug")
 parser.add_argument("--config", type=str, default="./src/experiments.conf")
+parser.add_argument("--unique_after_sample", action="store_true")
+parser.add_argument("--use_unified_tensor", action="store_true")
 args = parser.parse_args()
 
 if torch.cuda.is_available():
@@ -50,18 +52,37 @@ if __name__ == "__main__":
     dataCenter.load_dataSet(ds)
     features = torch.FloatTensor(getattr(dataCenter, ds + "_feats")).to(device)
 
-    # TODO: KWU: add support toS the unique_after_sample flag
-    graphSage = GraphSage(
-        config["setting.num_layers"],
-        features.size(1),
-        config["setting.hidden_emb_size"],
-        features,
-        getattr(dataCenter, ds + "_adj_lists"),
-        device,
-        gcn=args.gcn,
-        agg_func=args.agg_func,
-    )
-    graphSage.to(device)
+    if args.use_unified_tensor:
+        graphSage = GraphSage(
+            config["setting.num_layers"],
+            features.size(1),
+            config["setting.hidden_emb_size"],
+            None,  # pass feature tensor after unified
+            getattr(dataCenter, ds + "_adj_lists"),
+            device,
+            use_unified_tensor=args.use_unified_tensor,
+            unique_after_sample=args.unified_after_sample,
+            gcn=args.gcn,
+            agg_func=args.agg_func,
+        )
+        graphSage.to(device)
+        features = features.to("unified")
+        graphSage.raw_features = features
+
+    else:
+        graphSage = GraphSage(
+            config["setting.num_layers"],
+            features.size(1),
+            config["setting.hidden_emb_size"],
+            features,
+            getattr(dataCenter, ds + "_adj_lists"),
+            device,
+            use_unified_tensor=args.use_unified_tensor,
+            unique_after_sample=args.unified_after_sample,
+            gcn=args.gcn,
+            agg_func=args.agg_func,
+        )
+        graphSage.to(device)
 
     num_labels = len(set(getattr(dataCenter, ds + "_labels")))
     classification = Classification(config["setting.hidden_emb_size"], num_labels)
@@ -80,6 +101,7 @@ if __name__ == "__main__":
     else:
         print("GraphSage with Net Unsupervised Learning")
 
+    # TODO: KWU: measure time for each epoch and/or step
     for epoch in range(args.epochs):
         print("----------------------EPOCH %d-----------------------" % epoch)
         graphSage, classification = apply_model(
