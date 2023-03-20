@@ -282,6 +282,10 @@ class GraphSage(nn.Module):
         self.raw_features = raw_features
         self.adj_lists = adj_lists
 
+        # TODO: KWU: expose number of samples per layer
+        # item 0 is the number of samples for the 1-st order neighbors of nodes in the batch
+        self.num_samples_per_layer = [10] * num_layers
+
         for index in range(1, num_layers + 1):
             layer_size = out_size if index != 1 else input_size
             setattr(
@@ -306,27 +310,34 @@ class GraphSage(nn.Module):
                     lower_samp_neighs,
                     lower_layer_nodes_dict,
                     lower_layer_nodes,
-                ) = self._get_unique_neighs_list(lower_layer_nodes)
+                ) = self._get_unique_neighs_list(
+                    lower_layer_nodes, num_samples_per_layer
+                )
                 nodes_batch_layers.insert(
                     0, (lower_layer_nodes, lower_samp_neighs, lower_layer_nodes_dict)
                 )
             else:
                 lower_samp_neighs = self._get_neighs_list_without_unique(
-                    lower_layer_nodes
+                    lower_layer_nodes, self.num_samples_per_layer[i]
                 )
                 nodes_batch_layers.insert(0, (lower_samp_neighs))
+                # flatten lower_sample_neighs to one dimension
+                lower_layer_nodes = [
+                    neigh for layer in lower_samp_neighs for neigh in layer
+                ]
 
         assert len(nodes_batch_layers) == self.num_layers + 1
 
         if self.unique_after_sample:
             pre_hidden_embs = self.raw_features
         else:
-            pre_hidden_embs = self.raw_features[nodes_batch_layers[0][0]]
+            pre_hidden_embs = self.raw_features[nodes_batch_layers[0]]
         for index in range(1, self.num_layers + 1):
             sage_layer = getattr(self, "sage_layer" + str(index))
-            pre_neighs = nodes_batch_layers[index - 1]
+
             # self.dc.logger.info('aggregate_feats.')
             if self.unique_after_sample:
+                pre_neighs = nodes_batch_layers[index - 1]
                 nb = nodes_batch_layers[index][0]
                 aggregate_feats = self.aggregate_for_deduplicated(
                     nb, pre_hidden_embs, pre_neighs
@@ -338,9 +349,13 @@ class GraphSage(nn.Module):
                     self_feats=pre_hidden_embs[nb], aggregate_feats=aggregate_feats
                 )
             else:
-                aggregate_feats = self.aggregate_for_undeduplicated(
-                    pre_hidden_embs, pre_neighs
-                )
+                if index > 1:
+                    pre_hidden_embs = pre_hidden_embs.reshape(
+                        -1,
+                        self.num_samples_per_layer[-index] + 1,
+                        pre_hidden_embs.shape[-1],
+                    )  # (product_of_all_sample_numbers_in_the_upcoming_layers, num_samples_this_layer, feat_dim)
+                aggregate_feats = self.aggregate_for_undeduplicated(pre_hidden_embs)
                 cur_hidden_embs = sage_layer(
                     self_feats=pre_hidden_embs[
                         :, -1
@@ -386,7 +401,7 @@ class GraphSage(nn.Module):
     # TODO: KWU: figure out performant implementation in pytorch and/or dgl
     def _get_neighs_list_without_unique(self, nodes, num_sample=10):
         assert num_sample is not None
-        to_neighs = [self.adj_lists[int(node)] for node in nodes]
+        to_neighs = [list(self.adj_lists[int(node)]) for node in nodes]
 
         # _sample = random.sample
         import numpy as np
@@ -404,16 +419,18 @@ class GraphSage(nn.Module):
         return samp_neighs
 
     # this function uses reshape and reduction to aggregate neighbors without deduplicating (unique) after sampling. This is similar to williamleif's GraphSAGE implementation.
-    def aggregate_for_undeduplicated(self, pre_hidden_embs, pre_neighs, num_sample=10):
-        samp_neighs = pre_neighs
-        if not self.gcn:
-            samp_neighs = [samp_neighs[i][:-1] for i in range(len(samp_neighs))]
+    def aggregate_for_undeduplicated(self, pre_hidden_embs, num_sample=10):
+        # samp_neighs = pre_neighs
         embed_matrix = pre_hidden_embs
+        neighbors_per_node = embed_matrix
+        if not self.gcn:
+            # samp_neighs = [samp_neighs[i][:-1] for i in range(len(samp_neighs))]
+            neighbors_per_node = embed_matrix[:, :-1]
         if self.agg_func == "MEAN":
-            neighbors_per_node = embed_matrix[samp_neighs]
+            # neighbors_per_node = embed_matrix[samp_neighs]
             aggregate_feats = torch.mean(neighbors_per_node, dim=1)
         elif self.agg_func == "MAX":
-            neighbors_per_node = embed_matrix[samp_neighs]
+            # neighbors_per_node = embed_matrix[samp_neighs]
             aggregate_feats = torch.max(neighbors_per_node, dim=1)[0]
         else:
             raise NotImplementedError

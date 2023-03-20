@@ -8,11 +8,11 @@ import numpy as np
 class DataCenter(object):
     """docstring for DataCenter"""
 
-    def __init__(self, config):
+    def __init__(self, config, graphiler_loader_path):
         super(DataCenter, self).__init__()
         self.config = config
         self.graphiler_loader = self.import_from_path(
-            "graphiler_loader", self.config["graphiler_loader.path"]
+            "graphiler_loader", graphiler_loader_path
         )
 
     def parse_feat_dim_and_num_classes(self, config):

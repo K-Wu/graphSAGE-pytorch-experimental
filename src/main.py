@@ -24,6 +24,7 @@ parser.add_argument("--max_vali_f1", type=float, default=0)
 parser.add_argument("--name", type=str, default="debug")
 parser.add_argument("--config", type=str, default="./src/experiments.conf")
 parser.add_argument("--unique_after_sample", action="store_true")
+# parser.add_argument("--graphiler_loader_path", type=str, default="../dgl_prelim/examples/common_utils_prelim/graphiler_datasets.py")
 parser.add_argument("--use_unified_tensor", action="store_true")
 args = parser.parse_args()
 
@@ -48,7 +49,9 @@ if __name__ == "__main__":
 
     # load data
     ds = args.dataSet
-    dataCenter = DataCenter(config)
+    dataCenter = DataCenter(
+        config, graphiler_loader_path=config["graphiler_loader.path"]
+    )
     dataCenter.load_dataSet(ds)
     features = torch.FloatTensor(getattr(dataCenter, ds + "_feats")).to(device)
 
@@ -61,7 +64,7 @@ if __name__ == "__main__":
             getattr(dataCenter, ds + "_adj_lists"),
             device,
             use_unified_tensor=args.use_unified_tensor,
-            unique_after_sample=args.unified_after_sample,
+            unique_after_sample=args.unique_after_sample,
             gcn=args.gcn,
             agg_func=args.agg_func,
         )
@@ -78,7 +81,7 @@ if __name__ == "__main__":
             getattr(dataCenter, ds + "_adj_lists"),
             device,
             use_unified_tensor=args.use_unified_tensor,
-            unique_after_sample=args.unified_after_sample,
+            unique_after_sample=args.unique_after_sample,
             gcn=args.gcn,
             agg_func=args.agg_func,
         )
