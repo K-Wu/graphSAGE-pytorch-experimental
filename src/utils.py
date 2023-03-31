@@ -10,6 +10,8 @@ from sklearn.metrics import f1_score
 import torch.nn as nn
 import numpy as np
 
+import time
+
 
 def evaluate(
     dataCenter, ds, graphSage, classification, device, max_vali_f1, name, cur_epoch
@@ -172,15 +174,18 @@ def apply_model(
     batches = math.ceil(len(train_nodes) / b_sz)
 
     visited_nodes = set()
-    # TODO: KWU: measure time for each epoch and/or step
+    # KWU: measure time for each epoch and/or step
     for index in range(batches):
+        batch_start_time = time.time()
         nodes_batch = train_nodes[index * b_sz : (index + 1) * b_sz]
 
         # extend nodes batch for unspervised learning
         # no conflicts with supervised learning
-        nodes_batch = np.asarray(
-            list(unsupervised_loss.extend_nodes(nodes_batch, num_neg=num_neg))
-        )
+        if learn_method != "sup":
+            # KWU: skipping this step if it is supervised learning
+            nodes_batch = np.asarray(
+                list(unsupervised_loss.extend_nodes(nodes_batch, num_neg=num_neg))
+            )
         visited_nodes |= set(nodes_batch)
 
         # get ground-truth for the nodes batch
@@ -213,12 +218,8 @@ def apply_model(
             elif unsup_loss == "normal":
                 loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
             loss = loss_net
+        forward_end_time = time.time()
 
-        print(
-            "Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] ".format(
-                index + 1, batches, loss.item(), len(visited_nodes), len(train_nodes)
-            )
-        )
         loss.backward()
         for model in models:
             nn.utils.clip_grad_norm_(model.parameters(), 5)
@@ -227,5 +228,18 @@ def apply_model(
         optimizer.zero_grad()
         for model in models:
             model.zero_grad()
+
+        batch_end_time = time.time()
+        print(
+            "Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}], forward elapsed_time: {:.4f}, total elapsed_time: {:.4f}".format(
+                index + 1,
+                batches,
+                loss.item(),
+                len(visited_nodes),
+                len(train_nodes),
+                forward_end_time - batch_start_time,
+                batch_end_time - batch_start_time,
+            )
+        )
 
     return graphSage, classification

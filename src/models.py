@@ -5,6 +5,8 @@ import random
 import torch.nn as nn
 import torch.nn.functional as F
 
+import time
+
 
 class Classification(nn.Module):
     def __init__(self, emb_size, num_classes):
@@ -279,11 +281,11 @@ class GraphSage(nn.Module):
         self.agg_func = agg_func
         self.unique_after_sample = unique_after_sample
 
-        # TODO: KWU: raw_features is going to be stored in unified tensor
+        # KWU: raw_features is going to be stored in unified tensor
         self.raw_features = raw_features
         self.adj_lists = adj_lists
 
-        # TODO: KWU: expose number of samples per layer and set it to 10, 25 to align with
+        # KWU: expose number of samples per layer and set it to 10, 25 to align with
         # item 0 is the number of samples for the 1-st order neighbors of nodes in the batch
         # self.num_samples_per_layer = [10] * num_layers
         self.num_samples_per_layer = fan_out
@@ -304,8 +306,9 @@ class GraphSage(nn.Module):
         lower_layer_nodes = list(nodes_batch)
         nodes_batch_layers = [(lower_layer_nodes,)]
         # self.dc.logger.info('get_unique_neighs.')
+        sampling_start_time = time.time()
         for i in range(self.num_layers):
-            # TODO: KWU: implement a non-unique version
+            # KWU: implemented a non-unique version
             # TODO: KWU: measure the sampling time
             if self.unique_after_sample:
                 (
@@ -327,7 +330,8 @@ class GraphSage(nn.Module):
                 lower_layer_nodes = [
                     neigh for layer in lower_samp_neighs for neigh in layer
                 ]
-
+        sampling_end_time = time.time()
+        print("sampling time: ", sampling_end_time - sampling_start_time)
         assert len(nodes_batch_layers) == self.num_layers + 1
 
         if self.unique_after_sample:

@@ -78,6 +78,7 @@ if __name__ == "__main__":
     else:
         graphSage = GraphSage(
             config["setting.num_layers"],
+            config["setting.fan_out"],
             features.size(1),
             config["setting.hidden_emb_size"],
             features,

@@ -71,6 +71,9 @@ class DataCenter(object):
         for edge in edges:
             adj_lists[edge[0]].add(edge[1])
             adj_lists[edge[1]].add(edge[0])
+        # convert every element in adj_lists to list so that np.random.choice could work
+        for key in adj_lists:
+            adj_lists[key] = list(adj_lists[key])
 
         setattr(self, dataSet + "_feats", feat_data)
         setattr(self, dataSet + "_labels", labels)
