@@ -14,7 +14,9 @@ parser = argparse.ArgumentParser(description="pytorch version of GraphSAGE")
 parser.add_argument("--dataSet", type=str, default="cora")
 parser.add_argument("--agg_func", type=str, default="MEAN")
 parser.add_argument("--epochs", type=int, default=50)
-parser.add_argument("--b_sz", type=int, default=20)
+parser.add_argument(
+    "--b_sz", type=int, default=1000, help="batch size"
+)  # KWU: set to 1000 this is the batch size
 parser.add_argument("--seed", type=int, default=824)
 parser.add_argument("--cuda", action="store_true", help="use CUDA")
 parser.add_argument("--gcn", action="store_true")
@@ -58,6 +60,7 @@ if __name__ == "__main__":
     if args.use_unified_tensor:
         graphSage = GraphSage(
             config["setting.num_layers"],
+            config["setting.fan_out"],
             features.size(1),
             config["setting.hidden_emb_size"],
             None,  # pass feature tensor after unified
@@ -127,6 +130,7 @@ if __name__ == "__main__":
                 device,
                 args.max_vali_f1,
                 args.name,
+                args.b_sz,
             )
         if args.learn_method != "unsup":
             args.max_vali_f1 = evaluate(

@@ -258,6 +258,7 @@ class GraphSage(nn.Module):
     def __init__(
         self,
         num_layers,
+        fan_out,
         input_size,
         out_size,
         raw_features,
@@ -282,9 +283,10 @@ class GraphSage(nn.Module):
         self.raw_features = raw_features
         self.adj_lists = adj_lists
 
-        # TODO: KWU: expose number of samples per layer
+        # TODO: KWU: expose number of samples per layer and set it to 10, 25 to align with
         # item 0 is the number of samples for the 1-st order neighbors of nodes in the batch
-        self.num_samples_per_layer = [10] * num_layers
+        # self.num_samples_per_layer = [10] * num_layers
+        self.num_samples_per_layer = fan_out
 
         for index in range(1, num_layers + 1):
             layer_size = out_size if index != 1 else input_size
@@ -311,7 +313,7 @@ class GraphSage(nn.Module):
                     lower_layer_nodes_dict,
                     lower_layer_nodes,
                 ) = self._get_unique_neighs_list(
-                    lower_layer_nodes, num_samples_per_layer
+                    lower_layer_nodes, self.num_samples_per_layer[i]
                 )
                 nodes_batch_layers.insert(
                     0, (lower_layer_nodes, lower_samp_neighs, lower_layer_nodes_dict)
@@ -419,6 +421,7 @@ class GraphSage(nn.Module):
         return samp_neighs
 
     # this function uses reshape and reduction to aggregate neighbors without deduplicating (unique) after sampling. This is similar to williamleif's GraphSAGE implementation.
+    # TODO: KWU: why the num_sample is unused
     def aggregate_for_undeduplicated(self, pre_hidden_embs, num_sample=10):
         # samp_neighs = pre_neighs
         embed_matrix = pre_hidden_embs

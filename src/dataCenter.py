@@ -40,7 +40,11 @@ class DataCenter(object):
 
     def load_graphiler_dataSet(self, dataSet):
 
-        g = self.graphiler_loader.graphiler_load_data(dataSet)
+        (
+            g,
+            ntype_offsets,
+            canonical_etypes_id_tuple,
+        ) = self.graphiler_loader.graphiler_load_data(dataSet)
 
         # NB: KWU: use feat_dim and num_classes to generate random features and labels
         # NB: KWU: these two parameters should override dataset properties
@@ -58,7 +62,13 @@ class DataCenter(object):
 
         # NB: KWU: create adj_lists from graph
         adj_lists = defaultdict(set)
-        for edge in g.edges():
+        # g.edges() is a two tensor tuple storing source nodes and destination nodes
+        # now iterate all the edges and add them to adj_lists
+        edges = torch.cat(
+            (g.edges()[0].unsqueeze(1), g.edges()[1].unsqueeze(1)), dim=1
+        ).tolist()
+        # list(zip(*g.edges()))
+        for edge in edges:
             adj_lists[edge[0]].add(edge[1])
             adj_lists[edge[1]].add(edge[0])
 
@@ -74,7 +84,7 @@ class DataCenter(object):
         setattr(self, dataSet + "_feats", feat_data)
         setattr(self, dataSet + "_labels", labels)
         setattr(self, dataSet + "_adj_lists", adj_lists)
-        raise NotImplementedError
+        return
 
     def load_dataSet(self, dataSet="cora"):
         if dataSet == "cora":

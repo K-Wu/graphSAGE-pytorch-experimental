@@ -86,16 +86,24 @@ def get_gnn_embeddings(gnn_model, dataCenter, ds):
 
 
 def train_classification(
-    dataCenter, graphSage, classification, ds, device, max_vali_f1, name, epochs=800
+    dataCenter,
+    graphSage,
+    classification,
+    ds,
+    device,
+    max_vali_f1,
+    name,
+    b_sz,
+    epochs=800,
 ):
     print("Training Classification ...")
     c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.5)
     # train classification, detached from the current graph
     # classification.init_params()
-    b_sz = 50
     train_nodes = getattr(dataCenter, ds + "_train")
     labels = getattr(dataCenter, ds + "_labels")
     features = get_gnn_embeddings(graphSage, dataCenter, ds)
+    # TODO: KWU: measure time
     for epoch in range(epochs):
         train_nodes = shuffle(train_nodes)
         batches = math.ceil(len(train_nodes) / b_sz)
